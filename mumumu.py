@@ -6,6 +6,8 @@ import cairo
 
 BILDO_LARĜO = 1920
 BILDO_ALTO = 1080
+BILDFREKVENCO = 30
+FINA_NOMBRO = 99
 
 ciferoj = [ '', 'unu', 'du', 'tri', 'kvar', 'kvin', 'ses',
             'sep', 'ok', 'naŭ' ]
@@ -129,22 +131,43 @@ def krei_bildon_por_nombro(nombro, muoj):
 
     surfaco.write_to_png("bildo.png")
 
+class BildRipetilo:
+    def __init__(self):
+        self.sonhoro = 0
+        self.bildhoro = 0
+
+    def ripeti(self, alff, sontempo):
+        bildoj = int(((self.sonhoro + sontempo) - self.bildhoro) *
+                     BILDFREKVENCO)
+        self.bildhoro += bildoj / BILDFREKVENCO
+        self.sonhoro += sontempo
+
+        buf = subprocess.check_output(["convert", "bildo.png", "rgb:-"])
+        for i in range(bildoj):
+            alff.stdin.write(buf)
+
 muoj = [ "mu?", "mu!" ]
 
 for muo in range(len(muoj)):
     rulu("espeak", "-veo", "-w" + muo_al_dosiero(muo), "--", muoj[muo])
 
-daŭroj_de_muoj = list(map(lambda x: mezuri_daŭron(muo_al_dosiero(muo)),
+daŭroj_de_muoj = list(map(lambda x: mezuri_daŭron(muo_al_dosiero(x)),
                           range(len(muoj))))
+daŭroj_de_frazoj = []
 
 sonnombro = 0
 
-for nombro in range(1, 100):
+for nombro in range(1, FINA_NOMBRO + 1):
+    sondosiero = sonnombro_al_dosiero(sonnombro)
+
     rulu("espeak",
          "-veo",
-         "-w" + sonnombro_al_dosiero(sonnombro),
+         "-w" + sondosiero,
          "--",
          nombro_al_frazo(nombro))
+    
+    daŭroj_de_frazoj.append(mezuri_daŭron(sondosiero))
+
     sonnombro += 1
 
     for muo in range(nombro):
@@ -157,5 +180,36 @@ for nombro in range(sonnombro):
     eligo.write("file '" + sonnombro_al_dosiero(nombro) + "'\n")
 eligo.close()
 
-rulu("ffmpeg", "-f", "concat", "-i", "concat.txt",
-     "-c:a", "libvorbis", "-aq", "4", "-y", "sono.ogg")
+argoj = [ "ffmpeg",
+          "-f", "rawvideo",
+          "-pixel_format", "rgb24",
+          "-video_size", "{}x{}".format(BILDO_LARĜO, BILDO_ALTO),
+          "-framerate", str(BILDFREKVENCO),
+          "-i", "-",
+          "-f", "concat", "-i", "concat.txt",
+          "-c:v", "libvpx",
+          "-b:v", "3M",
+          "-c:a", "libvorbis", "-aq", "4",
+          "-y",
+          "mumumu.webm" ]
+
+alff = subprocess.Popen(argoj, stdin = subprocess.PIPE)
+
+ripetilo = BildRipetilo()
+
+for nombro in range(1, FINA_NOMBRO + 1):
+    sondosiero = sonnombro_al_dosiero(sonnombro)
+
+    krei_bildon_por_nombro(nombro, 0)
+
+    ripetilo.ripeti(alff, daŭroj_de_frazoj[nombro - 1])
+    
+    for muo in range(nombro):
+        krei_bildon_por_nombro(nombro, muo + 1)
+
+        ripetilo.ripeti(alff, daŭroj_de_muoj[muo % len(muoj)])
+        
+alff.stdin.close()
+
+if alff.wait() != 0:
+    raise Exception("ffmpeg malsukcesis")
