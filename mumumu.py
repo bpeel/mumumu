@@ -4,8 +4,8 @@ import subprocess
 import shutil
 import cairo
 
-BILDO_LARĜO = 1920
-BILDO_ALTO = 1080
+BILDO_LARĜO = 852
+BILDO_ALTO = 480
 BILDFREKVENCO = 30
 FINA_NOMBRO = 99
 
